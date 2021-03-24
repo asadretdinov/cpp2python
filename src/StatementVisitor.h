@@ -17,6 +17,11 @@ public:
 	void VisitDeclStmt(const DeclStmt* Node);
 	void VisitCXXMemberCallExpr(const CXXMemberCallExpr* Node);
 	void VisitBinaryOperator(const BinaryOperator* Node);
+	void VisitForStmt(const ForStmt* Node);
+	void VisitCXXForRangeStmt(const CXXForRangeStmt* Node);
+	void VisitBreakStmt(const BreakStmt* Node);
+	void VisitContinueStmt(const ContinueStmt* Node);
+	void VisitUnaryOperator(const UnaryOperator* Node);
 private:
 	std::list<std::string> lines;
 };

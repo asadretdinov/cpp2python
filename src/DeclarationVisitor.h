@@ -15,7 +15,7 @@ public:
 	void VisitFieldDecl(const FieldDecl* F);
 	void VisitCXXConstructorDecl(const CXXConstructorDecl* C);
 	void VisitCXXMethodDecl(const CXXMethodDecl* M);
-
+	void VisitVarDecl(const VarDecl* D);
 private:
 	std::list<std::string> lines;
 

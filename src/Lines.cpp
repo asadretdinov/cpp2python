@@ -5,6 +5,11 @@ void shiftLines(std::list<std::string>& lines) {
 	for (auto& s : lines) s = std::string("\t") + s;
 }
 
+LinesList& commentLines(LinesList& lines) {
+	for (auto& s : lines) s = std::string("# ") + s;
+	return lines;
+}
+
 std::list<std::string>& shiftLinesRet(std::list<std::string>& lines) {
 	shiftLines(lines);
 	return lines;

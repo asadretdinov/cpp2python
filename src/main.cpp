@@ -24,7 +24,7 @@ public:
 
 	bool VisitDecl(Decl* D) {
 		if (D->getKind() == Decl::Kind::TranslationUnit) {
-			llvm::outs() << "Transation unit found\n";
+			//llvm::outs() << "Transation unit found\n";
 			auto* unit = D->getTranslationUnitDecl();
 			if (!unit) return true;
 
@@ -41,7 +41,7 @@ public:
 					continue;
 				}
 
-				llvm::outs() << "# Declated something at " << *position << " with type " << d->getDeclKindName() << "\n";
+				//llvm::outs() << "# Declated something at " << *position << " with type " << d->getDeclKindName() << "\n";
 				DeclarationVisitor v(d);
 				printLines(v.getLines());
 				std::cout << std::endl;

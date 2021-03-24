@@ -14,6 +14,11 @@ std::list<std::string> DeclarationVisitor::getLines() const {
 }
 
 void DeclarationVisitor::Visit(const Decl *Node) {
+	if (Node == nullptr) {
+		lines.push_back("<empty declaration>");
+		return;
+	}
+
 	// new node = new lines
 	lines.clear();
 
@@ -107,10 +112,12 @@ void DeclarationVisitor::VisitCXXConstructorDecl(const CXXConstructorDecl* C) {
 
 		std::list<std::string> initLines;
 		for (const auto* init : C->inits()) {
-			std::stringstream sInit;
-			sInit << "self." << init->getMember()->getNameAsString() <<
-				" = " << processExpr(init->getInit());
-			initLines.push_back(sInit.str());
+			if (init->getMember() != nullptr) {
+				std::stringstream sInit;
+				sInit << "self." << init->getMember()->getNameAsString() <<
+					" = " << processExpr(init->getInit());
+				initLines.push_back(sInit.str());
+			}
 		}
 		addLines(lines, shiftLinesRet(initLines));
 
@@ -123,6 +130,17 @@ void DeclarationVisitor::VisitCXXConstructorDecl(const CXXConstructorDecl* C) {
 }
 
 void DeclarationVisitor::VisitCXXMethodDecl(const CXXMethodDecl* M) {
+	if (!M->isCanonicalDecl()) {
+		lines.push_back("# external declaration of " + M->getQualifiedNameAsString());
+		return;
+	}
+
+	std::stringstream comment;
+	//comment << "# isDefined: " << M->isDefined();
+	//comment << " isCanonicalDecl: " << M->isCanonicalDecl();
+	//comment << " hasSkippedBody: " << M->hasSkippedBody();
+	//comment << " willHaveBody: " << M->willHaveBody();
+
 	std::stringstream method;
 	method << "def " << M->getNameAsString() << "(self";
 	size_t pi = 0;
@@ -132,14 +150,42 @@ void DeclarationVisitor::VisitCXXMethodDecl(const CXXMethodDecl* M) {
 	method << "):";
 
 	
-	StatementVisitor body(M->getBody());
-
+	lines.push_back(comment.str());
 	lines.push_back(method.str());
-	addLines(lines, shiftLinesRet(body.getLines()));
+	if (M->isPure()) {
+		addLines(lines, shiftLinesRet(std::list<std::string>{ "None" }));
+	}
+	else {
+		StatementVisitor body(M->getBody());
+		addLines(lines, shiftLinesRet(body.getLines()));
+	}
+}
+
+void DeclarationVisitor::VisitVarDecl(const VarDecl * D)
+{
+	lines.push_back(D->getNameAsString() + " = " + processExpr(D->getInit()));
 }
 
 void DeclarationVisitor::_visitRecordDecl(const CXXRecordDecl * R) {
-	lines.push_back(std::string("class ") + R->getNameAsString() + ":");
+	if (!R->isThisDeclarationADefinition()) {
+		lines.push_back("# forward declaration of " + R->getNameAsString());
+		return;
+	}
+
+	std::stringstream head;
+	head << "class " << R->getNameAsString();
+	if (R->getNumBases() > 0) {
+		size_t idx = 0;
+		head << "(";
+		for (auto b : R->bases()) {
+			head << (idx++ > 0 ? ", " : "") << b.getType()->getAsCXXRecordDecl()->getNameAsString();
+		}
+		head << "):";
+	}
+	else {
+		head << ":";
+	}
+	lines.push_back(head.str());
 
 	std::list<std::string> classLines;
 	classLines.push_back("# default implementation");
@@ -152,9 +198,32 @@ void DeclarationVisitor::_visitRecordDecl(const CXXRecordDecl * R) {
 
 	addLines(lines, shiftLinesRet(classLines));
 
+	bool isAllBodies = true;
 	for (const auto* m : R->methods()) {
-		DeclarationVisitor method(m);
-		addLines(lines, shiftLinesRet(method.getLines()));
+		// is this a method, not constructor
+		bool isMethod = !isa<CXXConstructorDecl>(m) && !isa<CXXDestructorDecl>(m)
+			&& !m->isCopyAssignmentOperator() && !m->isMoveAssignmentOperator() && !m->isDestroyingOperatorDelete();
+
+		// add constructor with body
+		isMethod |= (m->getBody() != nullptr);
+
+		if (isMethod) {
+			DeclarationVisitor method(m);
+			addLines(lines, shiftLinesRet(method.getLines()));
+		}
+		else {
+			addLines(lines, shiftLinesRet(LinesList{ "# skip " + m->getQualifiedNameAsString() }));
+		}
+
+		// do not check of pure virtual methods
+		if (isMethod && !m->isPure()) {
+			isAllBodies &= (m->getBody() != nullptr);
+		}
+	}
+
+	if (!isAllBodies) {
+		lines.clear();
+		lines.push_back("# skipped declaration of " + R->getQualifiedNameAsString());
 	}
 }
 
